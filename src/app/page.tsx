@@ -1,101 +1,155 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
+import ReactMarkdown from "react-markdown";
+import sendMessageAction from "@/actions/message.action"; // Import the server action
+import { useTransition } from "react"; // Import useTransition
+import Sidebar from "@/components/Sidebar";
+
+const ChatPage = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [isPending, startTransition] = useTransition(); //useTransition hook
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setNewMessage(e.target.value);
+  };
+
+  const sendMessage = async () => {
+    if (newMessage.trim() === "") return;
+
+    const userMessage: Message = {
+      id: uuidv4(),
+      text: newMessage,
+      sender: "user",
+    };
+
+    setMessages([...messages, userMessage]);
+    setNewMessage("");
+
+    startTransition(async () => {
+      try {
+        const botResponse = await sendMessageAction(
+          newMessage
+        ); // Call the server action
+        const botMessage: Message = {
+          id: uuidv4(),
+          text: botResponse,
+          sender: "bot",
+        };
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          botMessage,
+        ]);
+      } catch (error) {
+        console.error(
+          "Error calling server action:",
+          error
+        );
+        const errorMessage = {
+          id: uuidv4(),
+          text: "Error processing message",
+          sender: "bot",
+        };
+        setMessages((prevMessages: any) => [
+          ...prevMessages,
+          errorMessage,
+        ]);
+      }
+    });
+  };
+
+  useEffect(() => {
+    const initRes = async () => {
+      const initRes = await sendMessageAction(
+        "Just give a brief introduction about yourself. Remember you are a fine-tuned model of Gemini but fine tuned by Mannat named Jignes and you are fine tuned to be a brainrot AI Bot."
+      );
+      setMessages([
+        { id: uuidv4(), text: initRes, sender: "bot" },
+      ]);
+    };
+    initRes();
+  }, []);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="flex h-screen bg-[#F8F9FB] ">
+      {/* Sidebar */}
+      <Sidebar setMessages={setMessages} />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {messages.length === 0 && (
+          <div className=" flex-1 py-4 px-8 border-black overflow-y-auto flex justify-center">
+            <div className=" w-full h-full flex flex-col justify-center items-center lg:w-[800px]">
+              <div className="text-center text-2xl font-bold">
+                Welcome to Skibbidi.AI
+              </div>
+              <span className="text-sm text-gray-500">
+                start a conversation with me
+              </span>
+            </div>
+          </div>
+        )}
+        <div className=" flex-1 py-4 px-8 border-black overflow-y-auto flex justify-center">
+          <div className=" w-full lg:w-[800px]">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`mb-4 flex ${
+                  message.sender === "user"
+                    ? "justify-end"
+                    : "justify-start"
+                }`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-sm p-3 ${
+                    message.sender === "user"
+                      ? "bg-white border-2 border-black text-black"
+                      : "bg-[#F8F9FB] border-2 text-gray-700 border-black"
+                  }`}
+                >
+                  <ReactMarkdown>
+                    {message.text}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            ))}
+            {isPending && (
+              <div className="loader text-xl">
+                Processing...
+              </div>
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Chat Input */}
+        <div className="p-4 px-8 border-t">
+          <div className="max-w-[800px] mx-auto relative ">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={handleInputChange}
+              className="w-full border-2 rounded-sm p-4 pr-12 bg-white border-black text-black"
+              placeholder="What's in your mind?"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") sendMessage();
+              }}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={isPending}
+              className="absolute right-3 top-[28px] -translate-y-1/2 p-2 button-enter rounded-sm border-2 border-black bg-[#4E44FF] text-white"
+            >
+              {isPending ? "..." : "Enter"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default ChatPage;
